@@ -1,0 +1,25 @@
+{
+  "name": "lig-parameter-notebook-local",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-23",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lig-lab-notebook",
+      "migrations_dir": "migrations"
+    },
+    {
+      "binding": "BACKUP_DB",
+      "database_name": "lig-lab-backups",
+      "migrations_dir": "backup-migrations"
+    }
+  ],
+  "vars": {
+    "DEV_USER_ID": "local-test-owner"
+  }
+}

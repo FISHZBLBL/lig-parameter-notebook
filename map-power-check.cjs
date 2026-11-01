@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict');
+require('./shared/core.js');require('./shared/parameter-map.js');
+const C=globalThis.LIGCore,M=globalThis.LIGParameterMap;
+const fields={powerMode:'percent',power:1,arrayPercent:100,measuredPowerW:.0524,speed:5,frequency:726.314,spacing:10,electricalCount:3,characterizationCount:1,readingsPerSample:5,measurementLayout:'sample-repeats-v4'};
+const groups=[];function add(values){const g=C.createGroup({...fields,...values},groups);groups.push(g);return g;}
+const a=add({}),b=add({speed:2}),failed=add({spacing:25}),failed2=add({spacing:50});failed.electrical.forEach(s=>s.status='open');failed2.electrical.forEach(s=>s.status='failed');
+const before=JSON.stringify(groups),slice=M.buildSlice(groups,{});
+assert.equal(M.valueFor(a,'power'),52.4);assert.deepEqual(slice.xLevels,[10,25,50]);assert.deepEqual(slice.yLevels,[5,2]);assert.equal(slice.sliceGroups.length,4);assert.equal(JSON.stringify(groups),before);
+const differentSetting=add({power:3,arrayPercent:90});assert.equal(M.buildSlice(groups,{}).sliceGroups.length,5,'same measured mW must compare independently of controller/array percentages');
+const actualDifferent=add({measuredPowerW:.0647}),missing=add({measuredPowerW:null});
+const oldWatts=add({powerMode:'watts',power:.2,arrayPercent:null,measuredPowerW:null});
+assert.equal(M.valueFor(oldWatts,'power'),null,'historical W entry is not measured power');assert.equal(M.valueFor(missing,'power'),null,'missing mW must not become 0 or controller percentage');
+let powerSlice=M.buildSlice(groups,{axisX:'power',axisY:'speed'});assert.deepEqual(powerSlice.xLevels,[52.4,64.7,null]);assert.equal(powerSlice.sourceGroups.length,8);assert.equal(powerSlice.sliceGroups.length,6);
+const unknown=M.buildSlice(groups,{fixedValues:{power:null}});assert.deepEqual(unknown.sliceGroups.map(g=>g.id),[missing.id,oldWatts.id]);
+const tiny=add({measuredPowerW:.00000123456789});assert.equal(M.valueFor(tiny,'power'),.00123456789);
+let state=C.validateState({version:3,groups,selectedId:a.id});state=C.addQCReference(state,a.id);state=C.createQCRun(state,'QC-1',{date:a.date});
+assert.ok(M.buildSlice(state.groups,{fixedValues:{power:52.4}}).sliceGroups.some(g=>g.id===a.id),'QC reference remains experimental data');assert.ok(!M.buildSlice(state.groups,{axisX:'power',axisY:'speed'}).sourceGroups.some(g=>g.qc?.kind==='run'));
+const selected=M.buildSlice(groups,{axisX:'spacing',axisY:'speed',fixedValues:{power:64.7,frequency:726.314}});assert.deepEqual(selected.sliceGroups.map(g=>g.id),[actualDifferent.id]);assert.deepEqual(selected.xLevels,[10],'levels come from current fixed conditions');
+assert.throws(()=>M.buildSlice(groups,{axisX:'speed',axisY:'speed'}),/不同/);
+console.log('PASS: measured W→mW once, default spacing×speed, percentage-independent power comparisons, legacy/unknown power as explicit missing level, fine precision, fixed-condition levels, no data mutation, and daily QC exclusion with reference retained.');

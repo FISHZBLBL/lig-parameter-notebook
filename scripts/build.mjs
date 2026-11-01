@@ -1,0 +1,22 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const app=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const shared=path.resolve(app,'shared');
+const core=fs.readFileSync(path.join(shared,'core.js'),'utf8');
+fs.writeFileSync(path.join(app,'src/core.mjs'),core+'\nexport default globalThis.LIGCore;\n');
+fs.writeFileSync(path.join(app,'src/login-page.mjs'),'export default '+JSON.stringify(fs.readFileSync(path.join(app,'src/login.html'),'utf8'))+';\n');
+let ui=fs.readFileSync(path.join(app,'src/ui.js'),'utf8');
+const marker='  renderRecords();if(!protectUnreadable)save();else updateSaveStatus();';
+if(!ui.includes(marker))throw new Error('Cloud bootstrap marker missing');
+ui=ui.replace(marker,fs.readFileSync(path.join(app,'src/cloud-bridge.js'),'utf8')+'\n'+marker+'\n  startCloud();');
+const modules=[['core',core],['parameter-map',fs.readFileSync(path.join(shared,'parameter-map.js'),'utf8')],['batch-core',fs.readFileSync(path.join(shared,'batch-core.js'),'utf8')],['batch-ui',fs.readFileSync(path.join(shared,'batch-ui.js'),'utf8')],['cloud-sync',fs.readFileSync(path.join(shared,'cloud-sync.js'),'utf8')],['lens-ui',fs.readFileSync(path.join(app,'src/lens-ui.js'),'utf8')],['backup-ui',fs.readFileSync(path.join(app,'src/backup-ui.js'),'utf8')],['qc-ui',fs.readFileSync(path.join(app,'src/qc-ui.js'),'utf8')],['table-ui',ui]];
+const scripts=modules.map(([id,source])=>{
+  if(source.toLowerCase().includes('</script'))throw new Error('Unsafe script close in '+id);
+  return '<script id="lig-'+id+'">\n'+source+'\n</script>';
+}).join('\n');
+const shell=fs.readFileSync(path.join(app,'src/shell.html'),'utf8').replace('/* LIG_WORKSPACE_STYLES */',fs.readFileSync(path.join(app,'src/workspace.css'),'utf8'));
+if(shell.split('<!-- LIG_SCRIPTS -->').length!==2)throw new Error('HTML marker missing');
+fs.mkdirSync(path.join(app,'public'),{recursive:true});
+fs.writeFileSync(path.join(app,'public/index.html'),shell.replace('<!-- LIG_SCRIPTS -->',scripts));
+console.log('Built cloud HTML, shared validated core, and nine inline modules.');

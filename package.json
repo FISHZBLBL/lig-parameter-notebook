@@ -1,0 +1,23 @@
+{
+  "name": "lig-parameter-notebook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "wrangler dev --local --config wrangler.local.jsonc --ip 127.0.0.1 --port 8770",
+    "check": "node --check src/worker.mjs && node --check src/core.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "test": "node scripts/test.mjs"
+  },
+  "dependencies": {
+    "jose": "^6.1.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.154.0"
+  },
+  "description": "LIG laser-processing parameters, sheet-resistance measurements, QC and cloud backups",
+  "engines": {
+    "node": ">=24"
+  }
+}

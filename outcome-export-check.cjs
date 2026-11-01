@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');require('./shared/core.js');const C=globalThis.LIGCore;
+const fields={powerMode:'percent',power:1,arrayPercent:100,measuredPowerW:.0524,speed:5,frequency:726.314,spacing:25,electricalCount:3,characterizationCount:1,readingsPerSample:5,measurementLayout:'sample-repeats-v4'};
+const failed=C.createGroup({...fields,id:'FAIL-01'},[]);failed.electrical.forEach((s,i)=>{s.status=['open','overrange','failed'][i];s.note=['未检出导通','仪器显示OL','可见烧穿'][i];});
+assert.throws(()=>C.exportMeanCSV({groups:[failed]}),/没有可导出/);
+const csv=C.exportMeanCSV({groups:[failed]},{includeOutcome:true,spacingUnit:'mm'});
+assert.match(csv,/FAIL-01/);assert.match(csv,/异常\/无有效均值/);assert.match(csv,/断路/);assert.match(csv,/超量程/);assert.match(csv,/加工失败/);assert.match(csv,/可见烧穿/);assert.ok(csv.includes('"0.025","","异常/无有效均值"'),'failed mean stays blank, not zero');
+assert.equal(csv.trim().split('\r\n').length,2);
+const pending=C.createGroup({...fields,id:'PENDING-01'},[]);const measured=C.createGroup({...fields,id:'MEASURED-01'},[]);measured.electrical[0].values=Array(5).fill('100');measured.electrical[0].note='=1+1';
+const removed={...failed,id:'DELETED-01',deletedAt:'2026-11-01T00:00:00Z'},demo={...failed,id:'DEMO-01',isDemo:true};
+const mixed=C.exportMeanCSV({groups:[failed,pending,measured,removed,demo]},{includeOutcome:true});
+assert.equal(mixed.trim().split('\r\n').length,4);assert.match(mixed,/待测\/录入中/);assert.match(mixed,/部分测齐/);assert.ok(!mixed.includes('DELETED-01'));assert.ok(!mixed.includes('DEMO-01'));assert.ok(mixed.includes("'=1+1"));
+const simple=C.exportMeanCSV({groups:[failed,pending,measured]});assert.ok(!simple.includes('记录结果'));assert.ok(!simple.includes('FAIL-01'));assert.ok(!simple.includes('PENDING-01'));assert.ok(simple.includes('MEASURED-01'));
+assert.throws(()=>C.exportMeanCSV({groups:[failed]},{includeOutcome:'yes'}),/布尔值/);
+console.log('PASS: opt-in outcome CSV keeps all-failed and pending groups with blank means, statuses and notes; defaults remain concise; trash/demo and spreadsheet formula protection preserved.');
